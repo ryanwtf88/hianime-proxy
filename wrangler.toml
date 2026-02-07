@@ -1,4 +1,4 @@
-name = "hianime-api-proxy"
+name = "animo-proxy"
 main = "worker.js"
 compatibility_date = "2024-03-01"
 account_id = "cd4ab75cca150f63177325a6bb1c355f"
