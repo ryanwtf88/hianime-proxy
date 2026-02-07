@@ -168,19 +168,39 @@ export default {
         }
 
         try {
-            const targetReferer = referer || 'https://megacloud.tv/';
+            // Determine the correct referer
+            let targetReferer = referer || 'https://megacloud.tv/';
+            const targetUrl = new URL(url);
+            
+            // Special handling for cdn.dotstream.buzz (megaplay CDN)
+            if (targetUrl.hostname === 'cdn.dotstream.buzz') {
+                // For dotstream CDN, use megaplay.buzz as referer
+                targetReferer = 'https://megaplay.buzz/';
+            }
+            // If referer is just megacloud domain, construct a full embed URL
+            else if (targetReferer === 'https://megacloud.tv' || targetReferer === 'https://megacloud.tv/') {
+                // Extract video ID from URL if possible
+                const urlPath = targetUrl.pathname;
+                const videoIdMatch = urlPath.match(/\/([a-f0-9]{64,})\//);
+                if (videoIdMatch) {
+                    targetReferer = `https://megacloud.tv/embed-2/e-1/${videoIdMatch[1]}`;
+                } else {
+                    targetReferer = 'https://megacloud.tv/embed-2/e-1/';
+                }
+            }
+            
             const targetOrigin = new URL(targetReferer).origin;
 
             const headersMap = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Referer': targetReferer,
-                'Origin': targetOrigin,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
                 'Accept': '*/*',
                 'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'identity',
+                'Referer': targetReferer,
                 'Sec-Fetch-Dest': 'empty',
                 'Sec-Fetch-Mode': 'cors',
                 'Sec-Fetch-Site': 'cross-site',
-                'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+                'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
                 'Sec-Ch-Ua-Mobile': '?0',
                 'Sec-Ch-Ua-Platform': '"Windows"',
             };
@@ -194,8 +214,21 @@ export default {
 
             let response;
             const isNonStandardPort = url.includes(':2228');
+            
+            // List of CDNs that need special handling with socketFetch
+            // These CDNs block Cloudflare Worker IPs, so we use raw socket connections
+            const needsSocketFetch = isNonStandardPort || 
+                targetUrl.hostname.includes('haildrop') ||
+                targetUrl.hostname.includes('douvid') ||
+                targetUrl.hostname.includes('lightningspark') ||
+                targetUrl.hostname.includes('sunburst') ||
+                targetUrl.hostname.includes('sunshinerays') ||
+                targetUrl.hostname.includes('rainveil') ||
+                targetUrl.hostname.includes('fogtwist') ||
+                targetUrl.hostname.includes('stormshade') ||
+                targetUrl.hostname.includes('netmagcdn');
 
-            if (isNonStandardPort) {
+            if (needsSocketFetch) {
                 const sRes = await socketFetch(url, { headers: headersMap });
                 response = {
                     status: sRes.status,
@@ -219,7 +252,7 @@ export default {
 
             const responseHeaders = new Headers(response.headers);
             responseHeaders.set('Access-Control-Allow-Origin', '*');
-            responseHeaders.set('X-Proxy-Version', '1.1.0-fixed-headers');
+            responseHeaders.set('X-Proxy-Version', '1.2.1-no-origin');
 
             if (!response.ok && response.status !== 206) {
                 return new Response("Upstream error " + response.status, {
